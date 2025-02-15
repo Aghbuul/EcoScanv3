@@ -7,12 +7,12 @@ from PIL import Image
 import io
 from elevenlabs_integration import generate_voice_guidance, create_voice_summary
 
-# Load environment variables
+# Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
 
-# Configure APIs
+# Configure API keys and services
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 if GEMINI_API_KEY:
