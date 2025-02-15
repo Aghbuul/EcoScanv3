@@ -6,20 +6,18 @@ import base64
 from PIL import Image
 import io
 from elevenlabs_integration import generate_voice_guidance, create_voice_summary
-from flask_cors import CORS
 
 # Load environment variables from .env file
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
 
 # Configure API keys and services
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
-    client = genai.GenerativeModel('gemini-pro-vision')
+    client = genai.GenerativeModel('gemini-2.0-flash')
 
 # Define the recycling prompt
 RECYCLING_PROMPT = """You are an expert in sustainable waste management. Analyze the attached image and provide a response in the following format:
@@ -40,20 +38,9 @@ RECYCLING_PROMPT = """You are an expert in sustainable waste management. Analyze
 ## Environmental Impact
 🌍 Did you know? [Share one interesting fact about recycling this particular item, specifically focusing on its environmental impact. Make it engaging and quantifiable if possible.]"""
 
-@app.errorhandler(404)
-def not_found_error(error):
-    return jsonify({'error': 'Not found'}), 404
-
-@app.errorhandler(500)
-def internal_error(error):
-    return jsonify({'error': 'Internal server error'}), 500
-
 @app.route('/')
 def index():
-    try:
-        return render_template('index.html')
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    return render_template('index.html')
 
 @app.route('/static/<path:path>')
 def send_static(path):
@@ -109,12 +96,13 @@ def generate_voice():
         audio_base64 = base64.b64encode(audio).decode('utf-8')
         return jsonify({'audio': audio_base64})
     except Exception as e:
-        print(f"Error generating audio: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-# This is required for Vercel deployment
-app.debug = False
-application = app
+        error_message = str(e)
+        print(f"Error generating audio: {error_message}")
+        # Ensure the error message is properly escaped and formatted
+        return jsonify({
+            'error': 'Error generating audio',
+            'details': error_message
+        }), 500
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=int(os.getenv('PORT', 8080))) 
