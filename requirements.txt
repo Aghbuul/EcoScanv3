@@ -1,5 +1,6 @@
 flask==3.0.2
 python-dotenv==1.0.1
 google-generativeai==0.3.2
-Pillow==10.2.0
-python-magic==0.4.27 
+Pillow==11.1.0
+python-magic==0.4.27
+elevenlabs==0.2.26 

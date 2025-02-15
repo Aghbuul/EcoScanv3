@@ -9,20 +9,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultContent = document.querySelector('.result-content');
     const cameraButton = document.getElementById('cameraButton');
     const uploadButton = document.getElementById('uploadButton');
-    
-    // Audio elements
     const listenButton = document.getElementById('listenButton');
     const audioPlayer = document.getElementById('audioPlayer');
-    const playPauseButton = document.getElementById('playPauseButton');
-    const audioProgress = document.getElementById('audioProgress');
-    const audioProgressBar = document.getElementById('audioProgressBar');
-    const audioTime = document.getElementById('audioTime');
-    const volumeSlider = document.getElementById('volumeSlider');
-    const speedSelect = document.getElementById('speedSelect');
+    const audioElement = document.getElementById('audioElement');
+    const playbackSpeed = document.getElementById('playbackSpeed');
+    const loadingMessage = audioPlayer.querySelector('.loading-message');
     
-    let audio = null;
-    let audioData = null;
-    
+    let currentAudioCache = null;
+    let currentText = null;
+
     // Handle drag and drop
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -75,49 +70,55 @@ document.addEventListener('DOMContentLoaded', () => {
     analyzeButton.addEventListener('click', analyzeImage);
 
     // Handle listen button
-    listenButton.addEventListener('click', () => {
-        if (!audioData) return;
-        
-        if (!audio) {
-            // Create new audio instance
-            const audioBlob = base64ToBlob(audioData, 'audio/mpeg');
-            audio = new Audio(URL.createObjectURL(audioBlob));
-            
-            // Set up audio event listeners
-            audio.addEventListener('timeupdate', updateAudioProgress);
-            audio.addEventListener('ended', () => {
-                playPauseButton.innerHTML = '<span class="button-icon">▶️</span>';
-                audio.currentTime = 0;
-            });
-            
-            // Show audio player
-            audioPlayer.classList.add('visible');
+    listenButton.addEventListener('click', async () => {
+        if (currentAudioCache) {
+            toggleAudioPlayer(true);
+            return;
         }
-        
-        togglePlayPause();
+
+        if (!currentText) return;
+
+        try {
+            toggleAudioPlayer(true);
+            loadingMessage.classList.remove('hidden');
+            listenButton.disabled = true;
+
+            const response = await fetch('/api/generate-audio', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ text: currentText })
+            });
+
+            const data = await response.json();
+
+            if (data.error) {
+                throw new Error(data.error);
+            }
+
+            // Convert base64 to blob
+            const audioBlob = base64ToBlob(data.audio, 'audio/mpeg');
+            const audioUrl = URL.createObjectURL(audioBlob);
+            
+            // Cache the audio URL
+            currentAudioCache = audioUrl;
+            
+            // Set up audio player
+            audioElement.src = audioUrl;
+            loadingMessage.classList.add('hidden');
+            audioElement.play();
+
+        } catch (error) {
+            loadingMessage.textContent = `Error: ${error.message}`;
+        } finally {
+            listenButton.disabled = false;
+        }
     });
 
-    // Handle play/pause button
-    playPauseButton.addEventListener('click', togglePlayPause);
-
-    // Handle audio progress click
-    audioProgress.addEventListener('click', (e) => {
-        if (!audio) return;
-        const rect = audioProgress.getBoundingClientRect();
-        const pos = (e.clientX - rect.left) / rect.width;
-        audio.currentTime = pos * audio.duration;
-    });
-
-    // Handle volume change
-    volumeSlider.addEventListener('input', (e) => {
-        if (!audio) return;
-        audio.volume = e.target.value / 100;
-    });
-
-    // Handle playback speed change
-    speedSelect.addEventListener('change', (e) => {
-        if (!audio) return;
-        audio.playbackRate = parseFloat(e.target.value);
+    // Handle playback speed
+    playbackSpeed.addEventListener('change', () => {
+        audioElement.playbackRate = parseFloat(playbackSpeed.value);
     });
 
     function handleFile(file) {
@@ -133,15 +134,7 @@ document.addEventListener('DOMContentLoaded', () => {
             imagePreview.classList.remove('hidden');
             analyzeButton.disabled = false;
             resultContainer.classList.add('hidden');
-            
-            // Reset audio
-            if (audio) {
-                audio.pause();
-                audio = null;
-            }
-            audioData = null;
-            audioPlayer.classList.remove('visible');
-            listenButton.classList.remove('visible');
+            clearAudioCache();
         };
         reader.readAsDataURL(file);
     }
@@ -153,19 +146,42 @@ document.addEventListener('DOMContentLoaded', () => {
         imagePreview.classList.add('hidden');
         analyzeButton.disabled = true;
         resultContainer.classList.add('hidden');
-        
-        // Reset audio
-        if (audio) {
-            audio.pause();
-            audio = null;
+        clearAudioCache();
+    }
+
+    function clearAudioCache() {
+        if (currentAudioCache) {
+            URL.revokeObjectURL(currentAudioCache);
+            currentAudioCache = null;
         }
-        audioData = null;
-        audioPlayer.classList.remove('visible');
-        listenButton.classList.remove('visible');
+        currentText = null;
+        toggleAudioPlayer(false);
+    }
+
+    function toggleAudioPlayer(show) {
+        if (show) {
+            audioPlayer.classList.remove('hidden');
+        } else {
+            audioPlayer.classList.add('hidden');
+            audioElement.pause();
+            audioElement.currentTime = 0;
+        }
+    }
+
+    function base64ToBlob(base64, type) {
+        const binaryString = window.atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return new Blob([bytes], { type: type });
     }
 
     async function analyzeImage() {
         if (!imageInput.files.length) return;
+
+        // Clear any existing audio
+        clearAudioCache();
 
         // Show loading state
         analyzeButton.disabled = true;
@@ -190,6 +206,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(data.error);
             }
 
+            // Store the current text for audio generation
+            currentText = data.result;
+
             // Convert markdown to HTML (basic conversion)
             const formattedResult = data.result
                 .replace(/#{3} (.*?)\n/g, '<h3>$1</h3>')
@@ -201,12 +220,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resultContent.innerHTML = formattedResult;
             resultContainer.classList.remove('hidden');
-
-            // Handle audio
-            if (data.audio) {
-                audioData = data.audio;
-                listenButton.classList.add('visible');
-            }
         } catch (error) {
             resultContent.innerHTML = `<div style="color: var(--error-color)">Error: ${error.message}</div>`;
             resultContainer.classList.remove('hidden');
@@ -216,37 +229,5 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingSpinner.classList.add('hidden');
             analyzeButton.disabled = false;
         }
-    }
-
-    function togglePlayPause() {
-        if (!audio) return;
-        
-        if (audio.paused) {
-            audio.play();
-            playPauseButton.innerHTML = '<span class="button-icon">⏸️</span>';
-        } else {
-            audio.pause();
-            playPauseButton.innerHTML = '<span class="button-icon">▶️</span>';
-        }
-    }
-
-    function updateAudioProgress() {
-        if (!audio) return;
-        
-        const progress = (audio.currentTime / audio.duration) * 100;
-        audioProgressBar.style.width = `${progress}%`;
-        
-        const minutes = Math.floor(audio.currentTime / 60);
-        const seconds = Math.floor(audio.currentTime % 60);
-        audioTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
-    }
-
-    function base64ToBlob(base64, type) {
-        const binaryString = window.atob(base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-        }
-        return new Blob([bytes], { type: type });
     }
 }); 

@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import base64
 from PIL import Image
 import io
-from elevenlabs import generate as generate_voice, set_api_key, voices
+from elevenlabs_integration import generate_voice_guidance, create_voice_summary
 
 # Load environment variables
 load_dotenv()
@@ -14,14 +14,10 @@ app = Flask(__name__)
 
 # Configure APIs
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-ELEVENLABS_API_KEY = os.getenv('ELEVENLABS_API_KEY')
 
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
     client = genai.GenerativeModel('gemini-2.0-flash')
-
-if ELEVENLABS_API_KEY:
-    set_api_key(ELEVENLABS_API_KEY)
 
 # Define the recycling prompt
 RECYCLING_PROMPT = """You are an expert in sustainable waste management. Analyze the attached image and provide a response in the following format:
@@ -41,59 +37,6 @@ RECYCLING_PROMPT = """You are an expert in sustainable waste management. Analyze
 
 ## Environmental Impact
 🌍 Did you know? [Share one interesting fact about recycling this particular item, specifically focusing on its environmental impact. Make it engaging and quantifiable if possible.]"""
-
-def create_voice_summary(text):
-    """Create a concise, enthusiastic summary for voice conversion."""
-    prompt = """Create an enthusiastic and engaging 30-second summary (approximately 75 words) of the following recycling advice. 
-    Make it sound exciting and motivational, using an upbeat tone. Include encouraging phrases and positive reinforcement.
-    Focus on the most important preparation steps and disposal methods. Start with an energetic greeting and end with a motivational closer.
-    
-    Example style:
-    "Hey there, eco-warrior! Great news about recycling your [items]! Here's what you need to know... Remember, you're making a real difference!"
-    
-    Advice to summarize:
-    {text}"""
-    
-    response = client.generate_content(prompt.format(text=text))
-    return response.text.strip()
-
-def generate_audio(text):
-    """Generate audio using ElevenLabs API."""
-    try:
-        if not ELEVENLABS_API_KEY:
-            return None, "ElevenLabs API key not configured"
-            
-        # Get available voices
-        available_voices = voices()
-        if not available_voices:
-            return None, "No voices available"
-            
-        # Find a voice with a more enthusiastic style
-        voice_id = None
-        preferred_voices = ['Bella', 'Antoni', 'Sam']
-        for voice in available_voices:
-            if voice.name in preferred_voices:
-                voice_id = voice.voice_id
-                break
-        
-        if not voice_id and available_voices:
-            voice_id = available_voices[0].voice_id
-            
-        if not voice_id:
-            return None, "No suitable voice found"
-        
-        # Generate audio
-        audio_bytes = generate_voice(
-            text=text,
-            voice=voice_id,
-            model="eleven_monolingual_v1"
-        )
-        
-        # Convert to base64 for frontend
-        audio_b64 = base64.b64encode(audio_bytes).decode('utf-8')
-        return audio_b64, None
-    except Exception as e:
-        return None, str(e)
 
 @app.route('/')
 def index():
@@ -136,17 +79,24 @@ def recycle():
             {'mime_type': 'image/jpeg', 'data': img_str}
         ])
 
-        # Generate voice summary and audio
-        summary = create_voice_summary(response.text)
-        audio_b64, error = generate_audio(summary)
-
-        return jsonify({
-            'result': response.text,
-            'audio': audio_b64,
-            'error': error
-        })
+        return jsonify({'result': response.text})
 
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/generate-audio', methods=['POST'])
+def generate_voice():
+    try:
+        data = request.json
+        if not data or 'text' not in data:
+            return jsonify({'error': 'No text provided'}), 400
+
+        summary = create_voice_summary(data['text'])
+        audio = generate_voice_guidance(summary)
+        audio_base64 = base64.b64encode(audio).decode('utf-8')
+        return jsonify({'audio': audio_base64})
+    except Exception as e:
+        print(f"Error generating audio: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
