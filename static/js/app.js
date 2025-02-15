@@ -10,6 +10,19 @@ document.addEventListener('DOMContentLoaded', () => {
     const cameraButton = document.getElementById('cameraButton');
     const uploadButton = document.getElementById('uploadButton');
     
+    // Audio elements
+    const listenButton = document.getElementById('listenButton');
+    const audioPlayer = document.getElementById('audioPlayer');
+    const playPauseButton = document.getElementById('playPauseButton');
+    const audioProgress = document.getElementById('audioProgress');
+    const audioProgressBar = document.getElementById('audioProgressBar');
+    const audioTime = document.getElementById('audioTime');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const speedSelect = document.getElementById('speedSelect');
+    
+    let audio = null;
+    let audioData = null;
+    
     // Handle drag and drop
     dropZone.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -61,6 +74,52 @@ document.addEventListener('DOMContentLoaded', () => {
     // Handle analyze button
     analyzeButton.addEventListener('click', analyzeImage);
 
+    // Handle listen button
+    listenButton.addEventListener('click', () => {
+        if (!audioData) return;
+        
+        if (!audio) {
+            // Create new audio instance
+            const audioBlob = base64ToBlob(audioData, 'audio/mpeg');
+            audio = new Audio(URL.createObjectURL(audioBlob));
+            
+            // Set up audio event listeners
+            audio.addEventListener('timeupdate', updateAudioProgress);
+            audio.addEventListener('ended', () => {
+                playPauseButton.innerHTML = '<span class="button-icon">▶️</span>';
+                audio.currentTime = 0;
+            });
+            
+            // Show audio player
+            audioPlayer.classList.add('visible');
+        }
+        
+        togglePlayPause();
+    });
+
+    // Handle play/pause button
+    playPauseButton.addEventListener('click', togglePlayPause);
+
+    // Handle audio progress click
+    audioProgress.addEventListener('click', (e) => {
+        if (!audio) return;
+        const rect = audioProgress.getBoundingClientRect();
+        const pos = (e.clientX - rect.left) / rect.width;
+        audio.currentTime = pos * audio.duration;
+    });
+
+    // Handle volume change
+    volumeSlider.addEventListener('input', (e) => {
+        if (!audio) return;
+        audio.volume = e.target.value / 100;
+    });
+
+    // Handle playback speed change
+    speedSelect.addEventListener('change', (e) => {
+        if (!audio) return;
+        audio.playbackRate = parseFloat(e.target.value);
+    });
+
     function handleFile(file) {
         if (!file.type.startsWith('image/')) {
             alert('Please upload an image file');
@@ -74,6 +133,15 @@ document.addEventListener('DOMContentLoaded', () => {
             imagePreview.classList.remove('hidden');
             analyzeButton.disabled = false;
             resultContainer.classList.add('hidden');
+            
+            // Reset audio
+            if (audio) {
+                audio.pause();
+                audio = null;
+            }
+            audioData = null;
+            audioPlayer.classList.remove('visible');
+            listenButton.classList.remove('visible');
         };
         reader.readAsDataURL(file);
     }
@@ -85,6 +153,15 @@ document.addEventListener('DOMContentLoaded', () => {
         imagePreview.classList.add('hidden');
         analyzeButton.disabled = true;
         resultContainer.classList.add('hidden');
+        
+        // Reset audio
+        if (audio) {
+            audio.pause();
+            audio = null;
+        }
+        audioData = null;
+        audioPlayer.classList.remove('visible');
+        listenButton.classList.remove('visible');
     }
 
     async function analyzeImage() {
@@ -124,6 +201,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
             resultContent.innerHTML = formattedResult;
             resultContainer.classList.remove('hidden');
+
+            // Handle audio
+            if (data.audio) {
+                audioData = data.audio;
+                listenButton.classList.add('visible');
+            }
         } catch (error) {
             resultContent.innerHTML = `<div style="color: var(--error-color)">Error: ${error.message}</div>`;
             resultContainer.classList.remove('hidden');
@@ -133,5 +216,37 @@ document.addEventListener('DOMContentLoaded', () => {
             loadingSpinner.classList.add('hidden');
             analyzeButton.disabled = false;
         }
+    }
+
+    function togglePlayPause() {
+        if (!audio) return;
+        
+        if (audio.paused) {
+            audio.play();
+            playPauseButton.innerHTML = '<span class="button-icon">⏸️</span>';
+        } else {
+            audio.pause();
+            playPauseButton.innerHTML = '<span class="button-icon">▶️</span>';
+        }
+    }
+
+    function updateAudioProgress() {
+        if (!audio) return;
+        
+        const progress = (audio.currentTime / audio.duration) * 100;
+        audioProgressBar.style.width = `${progress}%`;
+        
+        const minutes = Math.floor(audio.currentTime / 60);
+        const seconds = Math.floor(audio.currentTime % 60);
+        audioTime.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    }
+
+    function base64ToBlob(base64, type) {
+        const binaryString = window.atob(base64);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return new Blob([bytes], { type: type });
     }
 }); 
