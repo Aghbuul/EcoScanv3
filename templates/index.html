@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EcoScan - Recycling Helper</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>EcoScan</h1>
+            <p class="subtitle">Scan items to learn how to recycle them properly</p>
+        </header>
+
+        <main>
+            <div class="upload-container">
+                <div class="upload-area" id="dropZone">
+                    <input type="file" id="imageInput" accept="image/*" class="file-input">
+                    <div class="upload-content">
+                        <div class="upload-icon">📸</div>
+                        <p>Drop an image here or click to upload</p>
+                    </div>
+                </div>
+                <div id="imagePreview" class="image-preview hidden">
+                    <img id="preview" src="" alt="Preview">
+                    <button class="clear-button" id="clearButton">×</button>
+                </div>
+            </div>
+
+            <button id="analyzeButton" class="analyze-button" disabled>
+                <span class="button-text">Analyze Item</span>
+                <div class="loading-spinner hidden"></div>
+            </button>
+
+            <div id="result" class="result-container hidden">
+                <div class="result-content"></div>
+            </div>
+        </main>
+
+        <footer>
+            <p>Powered by Gemini AI</p>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html> 
