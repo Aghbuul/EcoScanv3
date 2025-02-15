@@ -17,10 +17,20 @@
         <main>
             <div class="upload-container">
                 <div class="upload-area" id="dropZone">
-                    <input type="file" id="imageInput" accept="image/*" class="file-input">
+                    <input type="file" id="imageInput" accept="image/*" capture="environment" class="file-input">
                     <div class="upload-content">
                         <div class="upload-icon">📸</div>
-                        <p>Drop an image here or click to upload</p>
+                        <p>Take a photo or upload an image</p>
+                        <div class="upload-buttons">
+                            <button class="action-button camera-button" id="cameraButton">
+                                <span class="button-icon">📷</span>
+                                Take Photo
+                            </button>
+                            <button class="action-button upload-button" id="uploadButton">
+                                <span class="button-icon">📤</span>
+                                Upload Image
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div id="imagePreview" class="image-preview hidden">

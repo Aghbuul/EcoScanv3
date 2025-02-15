@@ -7,6 +7,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const analyzeButton = document.getElementById('analyzeButton');
     const resultContainer = document.getElementById('result');
     const resultContent = document.querySelector('.result-content');
+    const cameraButton = document.getElementById('cameraButton');
+    const uploadButton = document.getElementById('uploadButton');
     
     // Handle drag and drop
     dropZone.addEventListener('dragover', (e) => {
@@ -25,6 +27,22 @@ document.addEventListener('DOMContentLoaded', () => {
         if (e.dataTransfer.files.length) {
             handleFile(e.dataTransfer.files[0]);
         }
+    });
+
+    // Handle camera button
+    cameraButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        imageInput.setAttribute('capture', 'environment');
+        imageInput.click();
+    });
+
+    // Handle upload button
+    uploadButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        imageInput.removeAttribute('capture');
+        imageInput.click();
     });
 
     // Handle file input change
